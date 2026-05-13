@@ -2,9 +2,12 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.linear_model import Perceptron
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 
 DATA_PATH = Path(__file__).with_name("diabetes.csv")
@@ -54,11 +57,17 @@ def train_model(df: pd.DataFrame):
         stratify=y,
     )
 
-    model = RandomForestClassifier(
-        n_estimators=200,
-        max_depth=8,
+    perceptron = Perceptron(
+        max_iter=1000,
+        tol=1e-3,
+        eta0=1.0,
         random_state=42,
     )
+    model = make_pipeline(
+        StandardScaler(),
+        CalibratedClassifierCV(perceptron, cv=5),
+    )
+
     model.fit(X_train, y_train)
 
     test_predictions = model.predict(X_test)
@@ -90,7 +99,7 @@ def build_input_form() -> pd.DataFrame:
     return pd.DataFrame([values], columns=FEATURE_COLUMNS)
 
 
-def show_prediction(model: RandomForestClassifier, input_df: pd.DataFrame) -> None:
+def show_prediction(model, input_df: pd.DataFrame) -> None:
     prediction = model.predict(input_df)[0]
     prediction_proba = model.predict_proba(input_df)[0]
     safe_probability = prediction_proba[0] * 100
@@ -119,7 +128,7 @@ def show_prediction(model: RandomForestClassifier, input_df: pd.DataFrame) -> No
 def main() -> None:
     st.title("Dự đoán nguy cơ tiểu đường")
     st.write(
-        "Ứng dụng sử dụng mô hình Random Forest để ước lượng nguy cơ tiểu đường "
+        "Ứng dụng sử dụng mô hình Perceptron để ước lượng nguy cơ tiểu đường "
         "dựa trên các chỉ số sức khỏe trong bộ dữ liệu."
     )
 
@@ -130,7 +139,10 @@ def main() -> None:
         st.error(f"Không thể khởi tạo ứng dụng: {exc}")
         st.stop()
 
-    st.caption(f"Dữ liệu: {len(df)} dòng | Độ chính xác kiểm thử: {accuracy:.2%}")
+    st.caption(
+        f"Dữ liệu: {len(df)} dòng | Mô hình: Perceptron | "
+        f"Độ chính xác kiểm thử: {accuracy:.2%}"
+    )
 
     input_df = build_input_form()
 
